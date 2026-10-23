@@ -10,6 +10,7 @@ const (
 	flattening = 0.09796 // 1 - Rp/Re
 	ringAOuter = 2.2694  // A 环外缘 136775 km / 60268 km
 	ringCInner = 1.2390  // C 环内缘
+	ringBInner = 1.5270  // B 环内缘（C 环外缘）
 )
 
 // Geom 描述画布上土星的投影几何。
@@ -53,8 +54,10 @@ func (g *Geom) ringR(x, y float64) (float64, bool) {
 }
 
 // Masks 软掩膜：本体（不含挡在前面的环）、环（含越过本体的前半段）。
+// CRing 是环脊上 C 环（纱环）那一圈，是 Ring 的子集，单独做暗部保护与提亮。
 type Masks struct {
 	Body, Ring, Planet []float64
+	CRing              []float64
 	Derot              []float64 // 消自转作用区：本体去掉赤道环影带（环影不随行星自转）
 }
 
@@ -62,6 +65,7 @@ func (g *Geom) masks(w, h int, feather float64) Masks {
 	body := make([]float64, w*h)
 	ring := make([]float64, w*h)
 	derot := make([]float64, w*h)
+	cring := make([]float64, w*h)
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			i := y*w + x
@@ -72,6 +76,9 @@ func (g *Geom) masks(w, h int, feather float64) Masks {
 			switch {
 			case inRing && (front || !inGlobe):
 				ring[i] = 1
+				if !inGlobe && r < ringBInner {
+					cring[i] = 1
+				}
 			case inGlobe:
 				body[i] = 1
 				if r > 2.6 {
@@ -81,7 +88,7 @@ func (g *Geom) masks(w, h int, feather float64) Masks {
 		}
 	}
 	m := Masks{Body: gaussBlur(body, w, h, feather), Ring: gaussBlur(ring, w, h, feather),
-		Derot: gaussBlur(derot, w, h, 3*feather)}
+		Derot: gaussBlur(derot, w, h, 3*feather), CRing: gaussBlur(cring, w, h, feather)}
 	m.Planet = make([]float64, w*h)
 	for i := range m.Planet {
 		m.Planet[i] = math.Min(1, m.Body[i]+m.Ring[i])

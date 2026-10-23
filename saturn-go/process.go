@@ -11,6 +11,9 @@ type Params struct {
 	Denoise              float64
 	BodyGamma, RingGamma float64
 	RingContrast         float64
+	CRingGains           []float64 // C 环小波增益（温和，避免 B 环内缘振铃吃掉 C 环）
+	CRingGamma           float64   // C 环提亮 gamma（<1 提暗部）
+	CRingGain            float64   // C 环亮度倍数
 	WBMix                float64
 	Size                 int
 	Rotate               float64 // 输出旋转角（度）
@@ -137,6 +140,7 @@ func postProcess(S *Img, g Geom, p Params) (*Img, Masks) {
 	// 5. 小波锐化：本体与环用不同的增益，按掩膜融合
 	Lb := atrous(L, w, h, p.BodyGains, p.Denoise, mk.Planet)
 	Lr := atrous(L, w, h, p.RingGains, p.Denoise, mk.Planet)
+	Lc := atrous(L, w, h, p.CRingGains, p.Denoise, mk.Planet)
 
 	// 6. 色度降噪 + 分区饱和度 + 分区影调
 	var chroma [3][]float64
@@ -149,15 +153,18 @@ func postProcess(S *Img, g Geom, p Params) (*Img, Masks) {
 	}
 	out := NewImg(w, h)
 	for i := range L {
-		mb, mr := mk.Body[i], mk.Ring[i]
-		rest := math.Max(0, 1-mb-mr)
-		ls := mb*Lb[i] + mr*Lr[i] + rest*(Lb[i]+Lr[i])/2
+		mb, mc := mk.Body[i], mk.CRing[i]
+		mr := math.Max(0, mk.Ring[i]-mc) // A/B 环
+		rest := math.Max(0, 1-mb-mr-mc)
+		ls := mb*Lb[i] + mr*Lr[i] + mc*Lc[i] + rest*(Lb[i]+Lr[i])/2
 		ls = math.Max(0, ls)
 		tb := math.Pow(ls, p.BodyGamma)
+		// 暗部安全的对比度曲线：0→0、1→1，只拉开中间调，不会把 C 环这种弱信号截成 0
 		tr := math.Pow(ls, p.RingGamma)
-		tr = clamp01(0.5 + (tr-0.5)*p.RingContrast)
-		lt := mb*tb + mr*tr + rest*ls
-		sat := mb*p.BodySat + mr*p.RingSat + rest*1.0
+		tr = clamp01(tr + (p.RingContrast-1)*4*tr*(1-tr)*(tr-0.5))
+		tc := clamp01(p.CRingGain * math.Pow(ls, p.CRingGamma))
+		lt := mb*tb + mr*tr + mc*tc + rest*ls
+		sat := mb*p.BodySat + (mr+mc)*p.RingSat + rest*1.0
 		ratio := 1.0
 		if L[i] > 1e-4 {
 			ratio = lt / math.Max(L[i], 1e-4)

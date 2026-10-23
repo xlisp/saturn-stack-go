@@ -41,6 +41,9 @@ func main() {
 	flag.Float64Var(&p.RingSat, "ringsat", 0.55, "环饱和度倍数")
 	bg := flag.String("bodygains", "1.0,1.6,1.9,1.5,1.2,1.05", "本体小波增益")
 	rg := flag.String("ringgains", "1.0,2.2,2.3,1.6,1.15,1.0", "环小波增益")
+	cg := flag.String("cringgains", "1.0,1.2,1.3,1.15,1.0,1.0", "C 环小波增益")
+	flag.Float64Var(&p.CRingGamma, "cringgamma", 0.85, "C 环 gamma（<1 提亮暗部）")
+	flag.Float64Var(&p.CRingGain, "cringgain", 1.15, "C 环亮度倍数")
 	flag.Float64Var(&p.Denoise, "denoise", 0.8, "小波细层降噪强度")
 	flag.Float64Var(&p.BodyGamma, "bodygamma", 0.92, "本体 gamma")
 	flag.Float64Var(&p.RingGamma, "ringgamma", 1.25, "环 gamma")
@@ -54,7 +57,7 @@ func main() {
 	flag.Float64Var(&p.CassiniSoft, "cassinisoft", 2.2, "卡西尼缝柔化（输出像素）")
 	flag.Float64Var(&p.CassiniResolved, "cassiniresolved", 0.6, "环脊（数据已分辨）处少补的比例")
 	flag.Parse()
-	p.BodyGains, p.RingGains = parseGains(*bg), parseGains(*rg)
+	p.BodyGains, p.RingGains, p.CRingGains = parseGains(*bg), parseGains(*rg), parseGains(*cg)
 
 	paths, _ := filepath.Glob(filepath.Join(*in, "*.tif"))
 	more, _ := filepath.Glob(filepath.Join(*in, "*.tiff"))
