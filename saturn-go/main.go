@@ -34,7 +34,8 @@ func main() {
 	wpow := flag.Float64("wpow", 3, "清晰度权重指数，越大越偏向最清晰的帧")
 	dirFlag := flag.String("dir", "auto", "自转方向 auto|+1|-1")
 	frontFlag := flag.String("front", "auto", "环近侧 auto|+1|-1")
-	bDeg := flag.Float64("B", 0, "环张角 B（度，0=自动测量）")
+	bDeg := flag.Float64("B", 0, "环张角 B（度，0=按文件名时间由星历计算）")
+	useEphem := flag.Bool("ephem", true, "用星历计算 B（false 则从图像测量）")
 	var p Params
 	flag.Float64Var(&p.BodySat, "sat", 2.5, "本体饱和度倍数")
 	flag.Float64Var(&p.RingSat, "ringsat", 0.55, "环饱和度倍数")
@@ -48,6 +49,8 @@ func main() {
 	flag.IntVar(&p.Size, "size", 1400, "输出边长（像素）")
 	flag.Float64Var(&p.Rotate, "rot", 0, "输出旋转角度（度，逆时针）")
 	flag.Float64Var(&p.Margin, "margin", 1.15, "裁切边距系数")
+	flag.Float64Var(&p.CassiniDepth, "cassini", 0.6, "卡西尼缝压暗强度 0..1（0=关闭）")
+	flag.Float64Var(&p.CassiniWidth, "cassiniwidth", 1.0, "卡西尼缝宽度倍数")
 	flag.Parse()
 	p.BodyGains, p.RingGains = parseGains(*bg), parseGains(*rg)
 
@@ -110,8 +113,16 @@ func main() {
 
 	// ---- 3. 几何测量 ----
 	g := estimateGeom(S1.Lum(), w, h)
-	if *bDeg != 0 {
+	measuredB := g.B * 180 / math.Pi
+	switch {
+	case *bDeg != 0:
 		g.B = math.Abs(*bDeg) * math.Pi / 180
+	case *useEphem:
+		jd0, err := parseJD(paths[0])
+		must(err)
+		eb := saturnB(jd0 + (tRef-frames[0].T)/24)
+		fmt.Printf("  星历 B = %.2f°（图像测量 %.2f°）\n", eb, measuredB)
+		g.B = math.Abs(eb) * math.Pi / 180
 	}
 	switch *frontFlag {
 	case "+1":
@@ -157,6 +168,7 @@ func main() {
 	final, pm := postProcess(S, g, p)
 	must(savePNG(filepath.Join(*out, "masks.png"), maskPreview(S, pm)))
 	fin := framing(final, g, p)
+	applyCassini(fin, g, fitCassini(S.Lum(), w, h, g), p, frameMap(g, p))
 	must(savePNG(filepath.Join(*out, "saturn_final.png"), fin))
 	must(saveJPEG(filepath.Join(*out, "saturn_final.jpg"), fin))
 	must(writeTIFF16(filepath.Join(*out, "saturn_final.tif"), fin))

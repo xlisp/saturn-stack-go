@@ -15,6 +15,8 @@ type Params struct {
 	Size                 int
 	Rotate               float64 // 输出旋转角（度）
 	Margin               float64
+	CassiniDepth         float64 // 卡西尼缝压暗强度 0..1，0 关闭
+	CassiniWidth         float64 // 缝宽相对真实宽度的倍数
 }
 
 // atrous 对单通道做 B3 样条 à trous 小波分解后按层增益重建，细层做软阈值降噪。
@@ -173,24 +175,31 @@ func postProcess(S *Img, g Geom, p Params) (*Img, Masks) {
 	return out, mk
 }
 
+// frameMap 返回输出像素坐标 → 画布坐标的映射（以土星中心裁正方形、缩放、旋转）。
+func frameMap(g Geom, p Params) func(x, y float64) (float64, float64) {
+	N := p.Size
+	scale := 2 * g.Re * ringAOuter * p.Margin / float64(N)
+	rot := p.Rotate * math.Pi / 180
+	c, s := math.Cos(rot), math.Sin(rot)
+	return func(x, y float64) (float64, float64) {
+		dx := (x - float64(N-1)/2) * scale
+		dy := (y - float64(N-1)/2) * scale
+		return g.Cx + dx*c + dy*s, g.Cy - dx*s + dy*c
+	}
+}
+
 // framing 以土星中心为基准裁成正方形、放大并可选旋转。
 func framing(im *Img, g Geom, p Params) *Img {
 	N := p.Size
-	side := 2 * g.Re * ringAOuter * p.Margin
-	scale := side / float64(N)
+	mapXY := frameMap(g, p)
 	out := NewImg(N, N)
-	rot := p.Rotate * math.Pi / 180
-	c, s := math.Cos(rot), math.Sin(rot)
 	for y := 0; y < N; y++ {
 		for x := 0; x < N; x++ {
-			dx := (float64(x) - float64(N-1)/2) * scale
-			dy := (float64(y) - float64(N-1)/2) * scale
-			sx := g.Cx + dx*c + dy*s
-			sy := g.Cy - dx*s + dy*c
+			sx, sy := mapXY(float64(x), float64(y))
+			if sx < 0 || sy < 0 || sx > float64(im.W-1) || sy > float64(im.H-1) {
+				continue
+			}
 			for ch := 0; ch < 3; ch++ {
-				if sx < 0 || sy < 0 || sx > float64(im.W-1) || sy > float64(im.H-1) {
-					continue
-				}
 				out.P[ch][y*N+x] = clamp01(sampleCubic(im.P[ch], im.W, im.H, sx, sy))
 			}
 		}

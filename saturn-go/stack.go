@@ -34,6 +34,19 @@ func parseTime(name string) (float64, error) {
 	return float64(day)*24 + float64(hh) + (float64(mm)+float64(tt)/10)/60, nil
 }
 
+// parseJD 由文件名得到儒略日（UT）。
+func parseJD(name string) (float64, error) {
+	m := reTime.FindStringSubmatch(filepath.Base(name))
+	if m == nil {
+		return 0, fmt.Errorf("文件名里找不到时间 (YYYY-MM-DD-HHMM_T): %s", name)
+	}
+	v := make([]int, 6)
+	for i := range v {
+		v[i], _ = strconv.Atoi(m[i+1])
+	}
+	return julianDay(v[0], v[1], v[2], float64(v[3])+(float64(v[4])+float64(v[5])/10)/60), nil
+}
+
 func loadFrame(path string) (*Frame, error) {
 	t, err := parseTime(path)
 	if err != nil {
