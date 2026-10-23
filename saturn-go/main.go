@@ -49,8 +49,10 @@ func main() {
 	flag.IntVar(&p.Size, "size", 1400, "输出边长（像素）")
 	flag.Float64Var(&p.Rotate, "rot", 0, "输出旋转角度（度，逆时针）")
 	flag.Float64Var(&p.Margin, "margin", 1.15, "裁切边距系数")
-	flag.Float64Var(&p.CassiniDepth, "cassini", 0.6, "卡西尼缝压暗强度 0..1（0=关闭）")
+	flag.Float64Var(&p.CassiniDepth, "cassini", 0.35, "卡西尼缝压暗强度 0..1（0=关闭）")
 	flag.Float64Var(&p.CassiniWidth, "cassiniwidth", 1.0, "卡西尼缝宽度倍数")
+	flag.Float64Var(&p.CassiniSoft, "cassinisoft", 2.2, "卡西尼缝柔化（输出像素）")
+	flag.Float64Var(&p.CassiniResolved, "cassiniresolved", 0.6, "环脊（数据已分辨）处少补的比例")
 	flag.Parse()
 	p.BodyGains, p.RingGains = parseGains(*bg), parseGains(*rg)
 

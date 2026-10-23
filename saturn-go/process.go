@@ -17,6 +17,8 @@ type Params struct {
 	Margin               float64
 	CassiniDepth         float64 // 卡西尼缝压暗强度 0..1，0 关闭
 	CassiniWidth         float64 // 缝宽相对真实宽度的倍数
+	CassiniSoft          float64 // 压暗图层的高斯模糊（输出像素），匹配图像分辨率
+	CassiniResolved      float64 // 数据已分辨处（环脊）少补的比例 0..1
 }
 
 // atrous 对单通道做 B3 样条 à trous 小波分解后按层增益重建，细层做软阈值降噪。

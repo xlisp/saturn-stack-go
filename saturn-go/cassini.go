@@ -86,7 +86,9 @@ func fitCassini(lum []float64, w, h int, g Geom) Cassini {
 
 // applyCassini 在输出分辨率上把卡西尼缝沿拟合椭圆压暗。
 // 每个输出像素 4×4 超采样做抗锯齿；只作用于可见的环（近侧半边，或本体之外的远侧半边）。
-// 环脊处与数据中的暗缝重合（加深），中间段投影宽度不到 1 原始像素，这里按环轴对称补出。
+// 压暗量按"数据能否分辨"自适应：缝在图上投影宽度（原始像素）越宽，数据里本来就越清楚，补得越少；
+// 中间段投影宽度不到 1 原始像素、被视宁度完全抹平，按环的轴对称性全量补出。
+// 最后按图像本身的分辨率（PSF）模糊，避免出现比周围锐利得多的"画上去的线"。
 func applyCassini(out *Img, g Geom, cs Cassini, p Params, mapXY func(x, y float64) (float64, float64)) {
 	if p.CassiniDepth <= 0 {
 		return
@@ -96,25 +98,34 @@ func applyCassini(out *Img, g Geom, cs Cassini, p Params, mapXY func(x, y float6
 	const ss = 4
 	for y := 0; y < N; y++ {
 		for x := 0; x < N; x++ {
-			hit := 0
+			acc := 0.0
 			for j := 0; j < ss; j++ {
 				for i := 0; i < ss; i++ {
 					sx, sy := mapXY(float64(x)+(float64(i)+0.5)/ss-0.5, float64(y)+(float64(j)+0.5)/ss-0.5)
 					u, v := g.uv(sx, sy)
 					rho := math.Hypot(u/cs.A, v/cs.B)
-					if math.Abs(rho-1) > cassiniHalfW*p.CassiniWidth {
+					sig := cassiniHalfW * p.CassiniWidth
+					dr := (rho - 1) / sig
+					if dr*dr > 16 {
 						continue
 					}
-					front := v*g.B < 0
-					if front || g.globeRho(sx, sy) > 1 {
-						hit++
+					// 高斯截面：没有硬边，向两侧自然淡出
+					prof := math.Exp(-0.5 * dr * dr)
+					// 可见性软过渡：远侧半边在本体边缘处渐隐，而不是一刀切
+					vis := 1.0
+					if v*g.B >= 0 {
+						vis = smoothstep(1.0, 1.06, g.globeRho(sx, sy))
 					}
+					// 缝在图像上的垂直宽度 = 2·半宽 / |∇ρ|
+					grad := math.Hypot(u/(cs.A*cs.A), v/(cs.B*cs.B)) / rho
+					width := 2 * sig / grad
+					acc += prof * vis * (1 - p.CassiniResolved*smoothstep(1.5, 5, width))
 				}
 			}
-			cov[y*N+x] = float64(hit) / ss / ss
+			cov[y*N+x] = acc / ss / ss
 		}
 	}
-	cov = gaussBlur(cov, N, N, 0.5)
+	cov = gaussBlur(cov, N, N, p.CassiniSoft)
 	for i := range cov {
 		f := 1 - p.CassiniDepth*math.Min(1, cov[i])
 		for c := 0; c < 3; c++ {
