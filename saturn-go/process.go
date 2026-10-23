@@ -61,6 +61,7 @@ func postProcess(S *Img, g Geom, p Params) (*Img, Masks) {
 	im := S.Clone()
 	mk := g.masks(w, h, 1.5)
 	outside := gaussBlur(mk.Planet, w, h, 6)
+	fade := gaussBlur(mk.Planet, w, h, 10)
 
 	// 1. 背景扣除
 	for c := range im.P {
@@ -166,7 +167,7 @@ func postProcess(S *Img, g Geom, p Params) (*Img, Masks) {
 	for c := range out.P {
 		for i := range out.P[c] {
 			v := (out.P[c][i] - 0.01) / 0.99
-			out.P[c][i] = clamp01(v) * smoothstep(0, 0.05, outside[i]+0.02)
+			out.P[c][i] = clamp01(v) * smoothstep(0.002, 0.05, fade[i])
 		}
 	}
 	return out, mk

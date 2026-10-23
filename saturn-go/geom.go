@@ -55,11 +55,13 @@ func (g *Geom) ringR(x, y float64) (float64, bool) {
 // Masks 软掩膜：本体（不含挡在前面的环）、环（含越过本体的前半段）。
 type Masks struct {
 	Body, Ring, Planet []float64
+	Derot              []float64 // 消自转作用区：本体去掉赤道环影带（环影不随行星自转）
 }
 
 func (g *Geom) masks(w, h int, feather float64) Masks {
 	body := make([]float64, w*h)
 	ring := make([]float64, w*h)
+	derot := make([]float64, w*h)
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			i := y*w + x
@@ -72,10 +74,14 @@ func (g *Geom) masks(w, h int, feather float64) Masks {
 				ring[i] = 1
 			case inGlobe:
 				body[i] = 1
+				if r > 2.6 {
+					derot[i] = 1
+				}
 			}
 		}
 	}
-	m := Masks{Body: gaussBlur(body, w, h, feather), Ring: gaussBlur(ring, w, h, feather)}
+	m := Masks{Body: gaussBlur(body, w, h, feather), Ring: gaussBlur(ring, w, h, feather),
+		Derot: gaussBlur(derot, w, h, 3*feather)}
 	m.Planet = make([]float64, w*h)
 	for i := range m.Planet {
 		m.Planet[i] = math.Min(1, m.Body[i]+m.Ring[i])

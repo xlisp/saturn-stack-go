@@ -139,9 +139,9 @@ func main() {
 	case "-1":
 		dir = -1
 	default:
-		sp := derotScore(frames, ref, thetaRef, &g, tRef, omega, 1, mk.Body)
-		sm := derotScore(frames, ref, thetaRef, &g, tRef, omega, -1, mk.Body)
-		s0 := derotScore(frames, ref, thetaRef, &g, tRef, 0, 1, mk.Body)
+		sp := derotScore(frames, ref, thetaRef, &g, tRef, omega, 1, mk.Derot)
+		sm := derotScore(frames, ref, thetaRef, &g, tRef, omega, -1, mk.Derot)
+		s0 := derotScore(frames, ref, thetaRef, &g, tRef, 0, 1, mk.Derot)
 		fmt.Printf("== 消自转 ==\n  相关性  不消: %.4f  方向+1: %.4f  方向-1: %.4f\n", s0, sp, sm)
 		if sm > sp {
 			dir = -1
@@ -149,7 +149,7 @@ func main() {
 	}
 	span := (frames[len(frames)-1].T - frames[0].T) * 360 / *period
 	fmt.Printf("  采用方向 %+.0f，时间跨度内自转 %.1f°\n", dir, span)
-	S := stackFrames(frames, thetaRef, &g, tRef, omega, dir, mk.Body)
+	S := stackFrames(frames, thetaRef, &g, tRef, omega, dir, mk.Derot)
 	must(writeTIFF16(filepath.Join(*out, "stack_derotated.tif"), normalizeForSave(S)))
 
 	// ---- 5. 分区后期 ----

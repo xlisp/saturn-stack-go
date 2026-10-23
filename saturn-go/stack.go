@@ -166,7 +166,7 @@ func derotScore(frames []*Frame, ref int, thetaRef float64, g *Geom, tRef, omega
 		var sab, saa, sbb float64
 		for i := range A {
 			m := bodyMask[i]
-			if m < 0.99 || g.globeRho(float64(i%w), float64(i/w)) > 0.8 {
+			if m < 0.99 || g.globeRho(float64(i%w), float64(i/w)) > 0.85 {
 				continue
 			}
 			sab += A[i] * R[i]
